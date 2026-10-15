@@ -1,8 +1,11 @@
+import jwt from 'jsonwebtoken';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import app from '../app.js';
+import { AUTH_COOKIE_NAME } from '../config/auth.js';
+import { authRateLimiter } from '../middleware/rateLimiter.js';
 import User from '../models/User.js';
 
 const originalJwtSecret = process.env.JWT_SECRET;
@@ -16,12 +19,13 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
+  authRateLimiter.reset();
   await User.deleteMany({});
 });
 
 afterAll(async () => {
   await mongoose.disconnect();
-  await mongoServer.stop();
+  await mongoServer?.stop();
 
   if (originalJwtSecret === undefined) {
     delete process.env.JWT_SECRET;
@@ -122,5 +126,80 @@ describe('authentication routes', () => {
     expect(logoutResponse.status).toBe(200);
     expect(logoutResponse.headers['set-cookie'][0]).toMatch(/Expires=/i);
     expect(logoutResponse.headers['set-cookie'][0]).not.toMatch(/Max-Age=604800/i);
+  });
+
+  it('rejects expired, tampered, and malformed JWT cookies', async () => {
+    const expiredToken = jwt.sign(
+      { sub: new mongoose.Types.ObjectId().toString() },
+      process.env.JWT_SECRET,
+      { expiresIn: '-1s', issuer: 'fundflow', audience: 'fundflow-client' },
+    );
+    const tamperedToken = jwt.sign(
+      { sub: new mongoose.Types.ObjectId().toString() },
+      'wrong-secret-that-does-not-match-at-all-32chars',
+      { expiresIn: '1h', issuer: 'fundflow', audience: 'fundflow-client' },
+    );
+
+    const expiredResponse = await request(app)
+      .get('/api/auth/me')
+      .set('Cookie', `${AUTH_COOKIE_NAME}=${expiredToken}`);
+    const tamperedResponse = await request(app)
+      .get('/api/auth/me')
+      .set('Cookie', `${AUTH_COOKIE_NAME}=${tamperedToken}`);
+    const malformedResponse = await request(app)
+      .get('/api/auth/me')
+      .set('Cookie', `${AUTH_COOKIE_NAME}=not-a-valid-jwt-token`);
+
+    expect(expiredResponse.status).toBe(401);
+    expect(expiredResponse.body.error.code).toBe('INVALID_TOKEN');
+    expect(tamperedResponse.status).toBe(401);
+    expect(tamperedResponse.body.error.code).toBe('INVALID_TOKEN');
+    expect(malformedResponse.status).toBe(401);
+    expect(malformedResponse.body.error.code).toBe('INVALID_TOKEN');
+  });
+
+  it('enforces rate limiting on authentication attempts', async () => {
+    const originalMax = process.env.RATE_LIMIT_AUTH_MAX;
+    process.env.RATE_LIMIT_AUTH_MAX = '3';
+    authRateLimiter.reset();
+
+    try {
+      // First 3 attempts are allowed
+      for (let i = 0; i < 3; i++) {
+        const res = await request(app).post('/api/auth/login').send({
+          email: 'missing@example.com',
+          password: 'password123',
+        });
+        expect(res.status).toBe(401);
+      }
+
+      // 4th attempt exceeds rate limit
+      const rateLimitedResponse = await request(app).post('/api/auth/login').send({
+        email: 'missing@example.com',
+        password: 'password123',
+      });
+
+      expect(rateLimitedResponse.status).toBe(429);
+      expect(rateLimitedResponse.body.error.code).toBe('TOO_MANY_REQUESTS');
+      expect(rateLimitedResponse.headers['retry-after']).toBeDefined();
+    } finally {
+      if (originalMax === undefined) {
+        delete process.env.RATE_LIMIT_AUTH_MAX;
+      } else {
+        process.env.RATE_LIMIT_AUTH_MAX = originalMax;
+      }
+      authRateLimiter.reset();
+    }
+  });
+
+  it('rejects malformed JSON payloads with a clean error', async () => {
+    const response = await request(app)
+      .post('/api/auth/login')
+      .set('Content-Type', 'application/json')
+      .send('{ malformed json');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('INVALID_JSON');
+    expect(response.body.error.message).toBe('Request body must contain valid JSON.');
   });
 });
