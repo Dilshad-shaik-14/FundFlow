@@ -161,6 +161,16 @@ export async function createInvestor(request, response) {
     ...(followUpDate !== undefined && { followUpDate: asDate(followUpDate) }),
   });
 
+  const startupStillExists = await Startup.exists({
+    _id: startup._id,
+    owner: request.auth.userId,
+  });
+
+  if (!startupStillExists) {
+    await Investor.deleteOne({ _id: investor._id });
+    throw new HttpError(404, 'STARTUP_NOT_FOUND', 'Startup was not found.');
+  }
+
   response.status(201).json({
     success: true,
     data: { investor: serializeInvestor(investor, startup) },
@@ -216,11 +226,10 @@ export async function updateInvestor(request, response) {
 }
 
 export async function deleteInvestor(request, response) {
-  const { investor } = await findOwnedInvestor(request.params.investorId, request.auth.userId);
+  parseInvestorId(request.params.investorId);
   const deletedInvestor = await Investor.findOneAndDelete({
-    _id: investor._id,
+    _id: request.params.investorId,
     owner: request.auth.userId,
-    startup: investor.startup,
   });
 
   if (!deletedInvestor) {

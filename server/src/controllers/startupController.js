@@ -136,6 +136,7 @@ export async function deleteStartup(request, response) {
   }
 
   await Startup.deleteOne({ _id: startup._id, owner: request.auth.userId });
+  await Investor.deleteMany({ owner: request.auth.userId, startup: startup._id });
 
   response.json({ success: true, data: { message: 'Startup deleted successfully.' } });
 }

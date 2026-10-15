@@ -27,7 +27,7 @@ afterEach(async () => {
 
 afterAll(async () => {
   await mongoose.disconnect();
-  await mongoServer.stop();
+  await mongoServer?.stop();
 
   if (originalJwtSecret === undefined) {
     delete process.env.JWT_SECRET;
@@ -206,5 +206,37 @@ describe('investor routes', () => {
     expect(startupDeleteResponse.status).toBe(200);
     expect(await Investor.exists({ _id: investorId })).toBeNull();
     expect(await Startup.exists({ _id: startup.id })).toBeNull();
+  });
+
+  it('allows deleting an orphaned investor whose referenced startup does not exist', async () => {
+    const firstUserCookie = await registerUser('first@example.com');
+    const secondUserCookie = await registerUser('second@example.com');
+    const firstUser = await User.findOne({ email: 'first@example.com' });
+
+    const orphanedInvestor = await Investor.create({
+      owner: firstUser._id,
+      startup: new mongoose.Types.ObjectId(),
+      name: 'Orphaned Investor',
+      status: 'potential',
+    });
+
+    const foreignDeleteResponse = await request(app)
+      .delete(`/api/investors/${orphanedInvestor._id}`)
+      .set('Cookie', secondUserCookie);
+
+    expect(foreignDeleteResponse.status).toBe(404);
+    expect(foreignDeleteResponse.body.error.code).toBe('INVESTOR_NOT_FOUND');
+    expect(await Investor.exists({ _id: orphanedInvestor._id })).not.toBeNull();
+
+    const ownerDeleteResponse = await request(app)
+      .delete(`/api/investors/${orphanedInvestor._id}`)
+      .set('Cookie', firstUserCookie);
+
+    expect(ownerDeleteResponse.status).toBe(200);
+    expect(ownerDeleteResponse.body).toEqual({
+      success: true,
+      data: { message: 'Investor deleted successfully.' },
+    });
+    expect(await Investor.exists({ _id: orphanedInvestor._id })).toBeNull();
   });
 });
