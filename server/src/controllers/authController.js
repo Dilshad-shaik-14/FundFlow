@@ -53,7 +53,9 @@ function publicUser(user) {
 }
 
 function setAuthCookie(response, userId) {
-  response.cookie(AUTH_COOKIE_NAME, createAuthToken(userId), getAuthCookieOptions());
+  const token = createAuthToken(userId);
+  response.cookie(AUTH_COOKIE_NAME, token, getAuthCookieOptions());
+  return token;
 }
 
 export async function register(request, response) {
@@ -71,8 +73,14 @@ export async function register(request, response) {
     throw error;
   }
 
-  setAuthCookie(response, user._id);
-  response.status(201).json({ success: true, data: { user: publicUser(user) } });
+  const token = setAuthCookie(response, user._id);
+  response.status(201).json({
+    success: true,
+    data: {
+      token,
+      user: publicUser(user),
+    },
+  });
 }
 
 export async function login(request, response) {
@@ -86,8 +94,14 @@ export async function login(request, response) {
     throw new HttpError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect.');
   }
 
-  setAuthCookie(response, user._id);
-  response.json({ success: true, data: { user: publicUser(user) } });
+  const token = setAuthCookie(response, user._id);
+  response.json({
+    success: true,
+    data: {
+      token,
+      user: publicUser(user),
+    },
+  });
 }
 
 export async function logout(_request, response) {

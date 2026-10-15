@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import api from '../lib/api.js';
+import api, { clearStoredToken, setStoredToken } from '../lib/api.js';
 
 const AuthContext = createContext(null);
 
@@ -19,6 +19,7 @@ export function AuthProvider({ children }) {
       return response.data.data.user;
     } catch (requestError) {
       if (requestError.response?.status === 401) {
+        clearStoredToken();
         setUser(null);
         setStatus('ready');
         return null;
@@ -36,6 +37,9 @@ export function AuthProvider({ children }) {
 
   const login = async (credentials) => {
     const response = await api.post('/auth/login', credentials);
+    if (response.data?.data?.token) {
+      setStoredToken(response.data.data.token);
+    }
     setUser(response.data.data.user);
     setStatus('ready');
     setError('');
@@ -44,6 +48,9 @@ export function AuthProvider({ children }) {
 
   const register = async (details) => {
     const response = await api.post('/auth/register', details);
+    if (response.data?.data?.token) {
+      setStoredToken(response.data.data.token);
+    }
     setUser(response.data.data.user);
     setStatus('ready');
     setError('');
@@ -51,8 +58,12 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    await api.post('/auth/logout');
-    setUser(null);
+    try {
+      await api.post('/auth/logout');
+    } finally {
+      clearStoredToken();
+      setUser(null);
+    }
   };
 
   return (

@@ -22,10 +22,11 @@ export function createAuthToken(userId) {
 }
 
 export function getAuthCookieOptions() {
+  const isProduction = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL);
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    secure: isProduction,
+    sameSite: process.env.COOKIE_SAMESITE || (isProduction ? 'lax' : 'strict'),
     path: '/',
     maxAge: AUTH_TOKEN_MAX_AGE_MS,
   };
