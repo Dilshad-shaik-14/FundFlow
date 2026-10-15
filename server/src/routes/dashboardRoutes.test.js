@@ -27,7 +27,7 @@ afterEach(async () => {
 
 afterAll(async () => {
   await mongoose.disconnect();
-  await mongoServer.stop();
+  await mongoServer?.stop();
 
   if (originalJwtSecret === undefined) {
     delete process.env.JWT_SECRET;
