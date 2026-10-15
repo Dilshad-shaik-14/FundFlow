@@ -100,6 +100,7 @@ export default function StartupsPage() {
                 <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-600">{startup.description}</p>
               )}
               <button
+                aria-label={`Delete ${startup.name}`}
                 className="mt-5 text-sm font-medium text-red-700 hover:text-red-800"
                 onClick={() => deleteStartup(startup)}
                 type="button"

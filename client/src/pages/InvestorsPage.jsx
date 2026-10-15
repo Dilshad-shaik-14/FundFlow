@@ -113,6 +113,7 @@ export default function InvestorsPage() {
                     Edit
                   </Link>
                   <button
+                    aria-label={`Delete ${investor.name}`}
                     className="text-sm font-medium text-red-700 hover:text-red-800"
                     onClick={() => deleteInvestor(investor)}
                     type="button"

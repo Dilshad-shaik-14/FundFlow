@@ -39,7 +39,7 @@ describe('startup management pages', () => {
     );
 
     expect(await screen.findByRole('heading', { name: 'Aster Labs' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(screen.getByRole('button', { name: 'Delete Aster Labs' }));
 
     await waitFor(() => expect(api.delete).toHaveBeenCalledWith('/startups/startup-1'));
     expect(screen.getByText('No startups yet')).toBeInTheDocument();
@@ -77,7 +77,7 @@ describe('startup management pages', () => {
     );
 
     expect(await screen.findByRole('heading', { name: 'Aster Labs' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(screen.getByRole('button', { name: 'Delete Aster Labs' }));
 
     expect(window.confirm).toHaveBeenCalledWith(
       'Delete Aster Labs? Delete its linked investors first.',
@@ -174,5 +174,31 @@ describe('investor management pages', () => {
       followUpDate: '2026-11-01',
       notes: '',
     });
+  });
+
+  it('surfaces startup fetch errors and retries on the add investor page', async () => {
+    const apiGet = vi.spyOn(api, 'get').mockRejectedValueOnce({
+      response: { data: { error: { message: 'Startups failed to load.' } } },
+    });
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={['/investors/new']}>
+        <Routes>
+          <Route path="/investors/new" element={<InvestorEditorPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Startups failed to load.');
+    expect(screen.queryByText('Add a startup before creating an investor record.')).not.toBeInTheDocument();
+
+    apiGet.mockResolvedValueOnce({
+      data: { data: { startups: [{ id: 'startup-1', name: 'Aster Labs' }] } },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+
+    expect(await screen.findByLabelText('Startup')).toBeInTheDocument();
   });
 });

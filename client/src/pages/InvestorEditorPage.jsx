@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import InvestorForm from '../components/InvestorForm.jsx';
 import { getApiErrorMessage } from '../lib/api.js';
@@ -14,8 +14,10 @@ export default function InvestorEditorPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    let isActive = true;
+  const loadData = useCallback(() => {
+    setIsLoading(true);
+    setError('');
+
     const requests = [
       api.get('/startups'),
       ...(isEditing ? [api.get(`/investors/${investorId}`)] : []),
@@ -23,28 +25,22 @@ export default function InvestorEditorPage() {
 
     Promise.all(requests)
       .then(([startupResponse, investorResponse]) => {
-        if (isActive) {
-          setStartups(startupResponse.data.data.startups);
-          if (investorResponse) {
-            setInvestor(investorResponse.data.data.investor);
-          }
+        setStartups(startupResponse.data.data.startups);
+        if (investorResponse) {
+          setInvestor(investorResponse.data.data.investor);
         }
       })
       .catch((requestError) => {
-        if (isActive) {
-          setError(getApiErrorMessage(requestError));
-        }
+        setError(getApiErrorMessage(requestError));
       })
       .finally(() => {
-        if (isActive) {
-          setIsLoading(false);
-        }
+        setIsLoading(false);
       });
-
-    return () => {
-      isActive = false;
-    };
   }, [investorId, isEditing]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   async function saveInvestor(input) {
     setIsSubmitting(true);
@@ -65,7 +61,8 @@ export default function InvestorEditorPage() {
     }
   }
 
-  const missingStartup = !isLoading && startups.length === 0;
+  const initialLoadFailed = Boolean(error && (isEditing ? !investor : startups.length === 0));
+  const missingStartup = !isLoading && !error && startups.length === 0;
 
   return (
     <section className="mx-auto max-w-3xl">
@@ -78,8 +75,17 @@ export default function InvestorEditorPage() {
         </h1>
         {isLoading ? (
           <p className="py-8 text-sm text-slate-600">Loading investor details…</p>
-        ) : error && isEditing && !investor ? (
-          <p className="mt-5 rounded-lg bg-red-50 p-3 text-sm text-red-700" role="alert">{error}</p>
+        ) : initialLoadFailed ? (
+          <div className="mt-5 rounded-lg border border-red-200 bg-red-50 p-4">
+            <p className="text-sm text-red-700" role="alert">{error}</p>
+            <button
+              className="mt-3 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
+              onClick={loadData}
+              type="button"
+            >
+              Try again
+            </button>
+          </div>
         ) : missingStartup ? (
           <div className="mt-5 rounded-lg bg-amber-50 p-4 text-sm text-amber-900">
             <p>Add a startup before creating an investor record.</p>
