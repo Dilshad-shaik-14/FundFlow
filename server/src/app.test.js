@@ -9,4 +9,14 @@ describe('health endpoint', () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ success: true, data: { status: 'ok' } });
   });
+
+  it('reports root API info at /api', async () => {
+    const response = await request(app).get('/api');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      data: { name: 'FundFlow API', status: 'ok' },
+    });
+  });
 });

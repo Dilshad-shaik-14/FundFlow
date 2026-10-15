@@ -24,6 +24,10 @@ app.use(
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
+app.get('/api', (_request, response) => {
+  response.json({ success: true, data: { name: 'FundFlow API', status: 'ok' } });
+});
+
 app.get('/api/health', (_request, response) => {
   response.json({ success: true, data: { status: 'ok' } });
 });

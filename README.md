@@ -108,6 +108,27 @@ transaction support. Follow-up dates use `YYYY-MM-DD` date-only values.
   the hosting layer and allow the client origin through `CLIENT_URL`.
 - Run `npm test` and `npm run build` before release.
 
+### Deploying to Vercel
+
+FundFlow includes native zero-config deployment support for Vercel using `vercel.json` and a serverless API endpoint at `api/index.js`:
+
+1. **Import the repository into Vercel**:
+   - Framework Preset: **Vite** (or Other)
+   - Root Directory: `./` (repository root)
+   - Build Command: `npm run build --workspace client` (handled automatically via `vercel.json`)
+   - Output Directory: `client/dist` (handled automatically via `vercel.json`)
+
+2. **Configure Environment Variables** in Vercel Project Settings:
+   - `MONGODB_URI`: Your MongoDB Atlas connection string.
+   - `JWT_SECRET`: A secure random secret (32+ characters).
+   - `NODE_ENV`: `production`
+   - `TRUST_PROXY`: `1`
+
+3. **Architecture & Routing**:
+   - The Vite React application is compiled into `client/dist` and served from Vercel's global Edge network with full client-side SPA routing support.
+   - All `/api/*` endpoints are dynamically routed to the serverless entrypoint (`api/index.js`), which maintains a cached Mongoose connection pool across lambda invocations.
+   - Requests on the same Vercel domain use `/api` directly, avoiding cross-origin overhead and ensuring strict HTTP-only cookie delivery.
+
 ## AI-assisted development tasks
 
 1. **Multi-Tenant Ownership & Schema Invariant Modeling**:
