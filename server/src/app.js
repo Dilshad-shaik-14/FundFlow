@@ -14,10 +14,25 @@ if (process.env.NODE_ENV === 'production' || process.env.TRUST_PROXY) {
   app.set('trust proxy', 1);
 }
 
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  'http://localhost:5173',
+  'http://localhost:5000',
+].filter(Boolean);
+
 app.use(helmet());
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: (origin, callback) => {
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        (typeof origin === 'string' && (origin.endsWith('.vercel.app') || (process.env.VERCEL_URL && origin === `https://${process.env.VERCEL_URL}`)))
+      ) {
+        return callback(null, true);
+      }
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
     credentials: true,
   }),
 );
