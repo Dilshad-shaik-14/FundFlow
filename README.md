@@ -80,6 +80,11 @@ Authentication uses a JWT in an HttpOnly, SameSite=Strict cookie; it is not
 stored in browser storage. The client sends credentialed requests. In
 production, serve the client and API over HTTPS and keep them on the same
 site so the cookie policy works. Set `CLIENT_URL` to the exact client origin.
+Authentication endpoints (`/api/auth/register`, `/api/auth/login`) are protected
+by an IP-based rate limiter (defaults to 20 attempts per 15-minute window;
+configurable via `RATE_LIMIT_AUTH_MAX`) returning HTTP `429 TOO_MANY_REQUESTS`.
+Behind reverse proxies (Render, AWS ALB, NGINX), set `TRUST_PROXY=1` or
+`NODE_ENV=production` to ensure client IPs are correctly resolved.
 
 Every startup and investor query is scoped to the authenticated account.
 Investor creation and reassignment verify that the selected startup belongs to
@@ -105,9 +110,26 @@ transaction support. Follow-up dates use `YYYY-MM-DD` date-only values.
 
 ## AI-assisted development tasks
 
-- Planned the client/server architecture, ownership model, API boundaries, and
-  implementation sequence with AI assistance.
-- Used AI assistance to draft the React pages, Express controllers, Mongoose
-  models, validation, and cookie-authentication flow.
-- Used AI assistance to create security and integration tests, then ran the
-  project tests and build and corrected issues found during verification.
+1. **Multi-Tenant Ownership & Schema Invariant Modeling**:
+   - Collaborated with AI to design the multi-tenant ownership model across MongoDB and Mongoose.
+   - Enforced strict user-scoping on every startup and investor operation (`owner: request.auth.userId`).
+   - Integrated Zod validation schemas with `.strict()` parsing to eliminate mass-assignment and NoSQL query injection across all API endpoints.
+
+2. **Relational Integrity & Race Condition Mitigation for Standalone MongoDB**:
+   - Analyzed the trade-offs of MongoDB multi-document transactions (which require replica sets) versus explicit application-level guards for standalone instances.
+   - Implemented the `409 STARTUP_HAS_INVESTORS` deletion rejection guard to prevent orphaned records without non-atomic cascades.
+   - Resolved concurrency race conditions between startup deletion and investor creation using post-delete cleanup and post-create atomic existence verification, ensuring orphaned investor records can always be deleted by their authenticated owners.
+
+3. **Hardened Cookie Authentication & Rate Limiting Defense**:
+   - Implemented an `HttpOnly`, `SameSite=Strict`, `Secure` session cookie strategy to eliminate token exposure in browser storage (`localStorage`/`sessionStorage`).
+   - Protected against bcrypt password truncation attacks by validating `Buffer.byteLength(password, 'utf8') <= 72`.
+   - Developed an in-memory IP-based rate limiting middleware on `/api/auth/register` and `/api/auth/login` to prevent CPU exhaustion and brute-force attacks, with reverse proxy `trust proxy` support.
+
+4. **Deterministic In-Memory Integration Testing**:
+   - Structured automated test suites utilizing `mongodb-memory-server` and `supertest` for zero-external-dependency execution in CI and local environments.
+   - Created comprehensive test coverage for cross-user authorization boundaries (IDOR), expired and tampered JWT rejection, duplicate email handling, rate limiting thresholds, and pipeline aggregation metrics.
+
+5. **Frontend State Resilience & Accessibility**:
+   - Structured React 19 pages with explicit loading, empty, and error recovery states.
+   - Corrected state edge cases in `InvestorEditorPage` where startup loading failures previously rendered misleading empty prompts instead of accessible alerts with retry actions.
+   - Enhanced screen reader accessibility by adding record-specific accessible labels (`aria-label`) to list action buttons.
