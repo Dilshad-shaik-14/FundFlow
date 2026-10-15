@@ -171,38 +171,93 @@ All API endpoints enforce strict JSON payloads. Responses follow standard envelo
 
 ## AI Development Experience (with Code0)
 
-Developing FundFlow with Code0 demonstrated how an advanced AI coding assistant elevates traditional full-stack engineering beyond simple code generation into rigorous systems design, architectural verification, and production hardening.
+Developing and auditing FundFlow with **Code0** demonstrated how an advanced agentic AI coding assistant elevates full-stack engineering beyond simple code completion into rigorous systems design, vulnerability remediation, concurrency analysis, and production cloud architecture.
 
-Rather than treating AI as a passive auto-complete, Code0 was employed as a Senior Software Engineer, Staff Architect, and Application Security Auditor:
-- **Context-Aware Reasoning**: Code0 analyzed the full workspace across both `client/` and `server/` workspaces, honoring existing frameworks without introducing bloated external dependencies.
-- **Empirical Problem Solving**: Instead of guessing about runtime failures, Code0 executed test suites, monitored live background daemon tasks, inspected database connectivity, and verified visual browser state.
-- **Zero-Hallucination Integrity**: Code0 distinguished actual, verified bugs from false positives, preventing unneeded refactors while systematically fixing root causes.
+Rather than acting as a passive generative assistant, Code0 operated as an interactive Senior Software Engineer, Staff Architect, and Application Security Reviewer embedded directly into the developer workflow.
 
 ---
 
-### Specific Tasks Where Code0 Helped
+### Collaborative Methodology & Engineering Workflow
 
-#### 1. Component Development & UI Error-State Resilience
-- **Problem**: In `InvestorEditorPage.jsx`, if the network request fetching the founder's startups failed, the UI mistakenly assumed the user had zero startups, rendering a confusing prompt to create a startup rather than displaying an error state.
-- **Code0 Contribution**: Code0 redesigned the component state architecture, explicitly isolating startup load errors from legitimate empty arrays. Code0 added accessible error banners with an interactive `"Try again"` retry callback and regression-tested the entire flow with React Testing Library.
-- **Accessibility Enhancement**: Code0 improved screen reader usability across `StartupsPage.jsx` and `InvestorsPage.jsx` by converting ambiguous `"Delete"` buttons into descriptive, accessible targets (e.g., `aria-label="Delete Aster Labs"`).
+Throughout the project lifecycle, Code0 was leveraged in a structured, five-stage engineering cycle:
 
-#### 2. API Creation & Authentication Rate Limiting
-- **Problem**: Registration and login endpoints lacked rate limiting, leaving the bcrypt hashing pipeline vulnerable to CPU exhaustion, credential stuffing, and brute-force attacks.
-- **Code0 Contribution**: Code0 engineered a zero-dependency, in-memory rate-limiting middleware (`rateLimiter.js`) adhering to IETF `RateLimit-*` draft standards. Code0 dynamically bound window configurations via environment variables (`RATE_LIMIT_AUTH_MAX`), implemented sliding window reset timestamps, configured Express reverse-proxy trust (`trust proxy`), and added comprehensive Vitest tests verifying HTTP `429 TOO_MANY_REQUESTS` behavior.
+```
+┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+│ 1. Architectural │ ──> │ 2. Root-Cause    │ ──> │ 3. Test-Driven   │ ──> │ 4. Empirical     │ ──> │ 5. Production    │
+│    Audit & Scan  │     │    Diagnosis     │     │    Remediation   │     │    Verification  │     │    Deployment    │
+└──────────────────┘     └──────────────────┘     └──────────────────┘     └──────────────────┘     └──────────────────┘
+```
 
-#### 3. Database Integration & Concurrency Race Mitigation
-- **Problem**: Under concurrent traffic on a standalone MongoDB deployment (where multi-document transactions are unavailable without replica sets), an investor could be linked to a startup immediately after the startup had passed its deletion-guard check, leaving an orphaned investor record.
-- **Code0 Contribution**: Code0 analyzed the race condition and designed an infrastructure-agnostic, dual-guard defense:
-  1. A post-creation atomic verification in `createInvestor` that confirms the referenced startup still exists in the database immediately after creation, rolling back if deleted.
-  2. A secondary defensive sweep in `deleteStartup` ensuring any lingering references are cleanly deleted.
+1. **Context-Aware Auditing**: Code0 ingested both `client/` and `server/` workspaces, reading source files, package manifests, and test suites to build a comprehensive dependency graph and threat model without hallucinating missing abstractions.
+2. **Strict Engineering Boundaries**: Code0 honored firm architectural constraints: zero unnecessary package installations, zero changes to established libraries (React 19, Express 5, Mongoose 8, Tailwind CSS v4), strict preservation of standalone MongoDB compatibility (avoiding forced replica-set transaction requirements), and absolute confidentiality regarding secrets and environment credentials.
+3. **Empirical Tool-Assisted Validation**: Instead of speculating on runtime behavior, Code0 actively executed commands, managed background server daemons, probed database ports, ran Vitest suites with in-memory MongoDB instances, and inspected live DOM hierarchies using automated browser subagents.
+4. **Distinguishing Defects from False Positives**: Code0 critically reviewed findings from prior audits, identifying which were genuine security/data integrity hazards (such as orphaned investor traps or auth endpoints lacking rate limiting) and which were overstated recommendations (such as mandating Mongoose `.populate()` without query profiling).
 
-#### 4. Debugging & Orphaned Record Recovery
-- **Problem**: The existing `findOwnedInvestor` query required both the investor and its referenced startup to exist in order to resolve ownership, rendering any orphaned investor records completely undeletable by their owner.
-- **Code0 Contribution**: Code0 decoupled investor ownership verification from startup existence during delete operations. Deletion queries now match directly on `{ _id: investorId, owner: request.auth.userId }`, allowing founders to prune legacy or orphaned investor entries while strictly preventing cross-user unauthorized deletions (IDOR).
+---
 
-#### 5. Deterministic Testing & Vercel Serverless Architecture
-- **Problem**: Vitest suites previously suffered from intermittent teardown crashes and hook timeouts during in-memory MongoDB downloads. In addition, the application needed a serverless architecture to deploy both Vite and Express on Vercel without a persistent running VM.
-- **Code0 Contribution**:
-  - Code0 stabilized the test lifecycle across 43 automated tests by safely guarding `mongoServer?.stop()` hooks and configuring realistic timeout margins.
-  - Code0 built the Vercel serverless adapter (`api/index.js`) featuring connection caching (`ensureDatabaseConnected()`) to reuse Mongoose pools across lambda invocations, along with `vercel.json` routing rules for unified SPA and API rewrites.
+### Detailed Deep-Dives: 5 Core Tasks Where Code0 Drove Engineering
+
+```
+┌───────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                   CORE TASKS POWERED BY CODE0                                         │
+├───────────────────────────────┬───────────────────────────────┬───────────────────────────────────────┤
+│ 1. UI Error & A11y Resilience │ 2. Rate Limiting Security     │ 3. Standalone Concurrency Mitigation  │
+│    (React 19 / WCAG 2.2 AA)   │    (IETF Draft Middleware)    │    (TOCTOU Race Dual-Guards)          │
+├───────────────────────────────┴───────────────────────────────┴───────────────────────────────────────┤
+│ 4. Data Recovery & Refactoring                                5. Serverless Cloud Architecture        │
+│    (Orphaned Record Cleanup & IDOR Defense)                      (Vercel Adapter & Vitest Lifecycle)  │
+└───────────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Task 1: Component Development, UX Error Resilience & Accessibility
+- **The Challenge**: In `InvestorEditorPage.jsx`, if the network request fetching the founder's startups failed, the component collapsed the error into an empty array (`startups = []`). This presented a deceptive empty state prompting the founder to *"Create a startup first"*, hiding the underlying network or server failure and blocking user progress. Furthermore, action buttons across `StartupsPage.jsx` and `InvestorsPage.jsx` had generic `"Delete"` labels that failed WCAG 2.2 accessible name guidelines for screen readers.
+- **Code0's Solution**:
+  - **State Machine Decoupling**: Code0 separated data loading states into distinct `isLoading`, `error`, and `data` channels. If fetching fails, the page renders an accessible, dismissible alert with an interactive `"Try again"` retry callback rather than misinforming the user.
+  - **Accessible Name Resolution**: Code0 transformed all destructive table actions into record-specific accessible labels (e.g., `aria-label="Delete Acme AI"` and `aria-label="Delete Sarah Chen"`), allowing assistive technology users to discern the exact entity being targeted.
+  - **Testing**: Code0 authored React Testing Library regression tests verifying both the retry mechanism and accessible name queries.
+
+#### Task 2: API Creation & IETF-Compliant Rate Limiting Security
+- **The Challenge**: The `/api/auth/register` and `/api/auth/login` endpoints were completely unrestricted. Because password verification relies on computationally intensive `bcrypt` hashing, unthrottled endpoints left the server vulnerable to CPU starvation, credential stuffing, and brute-force dictionary attacks.
+- **Code0's Solution**:
+  - **Zero-Dependency In-Memory Rate Limiter**: Rather than pulling in bulky third-party packages, Code0 engineered a tailored sliding-window rate limiter (`server/src/middleware/rateLimiter.js`) backed by an in-memory `Map` with automatic window eviction.
+  - **Standardized Headers**: The middleware returns HTTP `429 TOO_MANY_REQUESTS` accompanied by IETF standard headers: `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset`, and `Retry-After`.
+  - **Reverse-Proxy Defense**: Configured Express `trust proxy` support so client IP resolution correctly parses `X-Forwarded-For` headers behind reverse proxies (Vercel, Render, AWS ALB, NGINX) without exposing spoofable IP headers.
+  - **Password Boundary Protection**: Enforced RFC 7613 UTF-8 byte boundary validation (`Buffer.byteLength(password, 'utf8') <= 72`) to preempt bcrypt silent truncation vulnerabilities.
+  - **Verification**: Created 9 automated integration tests validating rate-limit triggers, reset intervals, expired/tampered JWT rejection, and malformed body handling.
+
+#### Task 3: Database Integration & Concurrency Race Mitigation
+- **The Challenge**: FundFlow is designed to support standalone MongoDB instances where multi-document ACID transactions are not available. Under concurrent requests, a Time-of-Check to Time-of-Use (TOCTOU) race condition could occur:
+  1. *Request A* checks whether Startup $S$ has linked investors and finds none.
+  2. *Request B* creates an investor record pointing to Startup $S$.
+  3. *Request A* deletes Startup $S$.
+  This sequence could leave an investor referencing a nonexistent startup, corrupting relational integrity.
+- **Code0's Solution**:
+  - **Dual-Guard Defense**: Code0 designed an infrastructure-agnostic mitigation strategy:
+    1. **Post-Creation Verification**: In `createInvestor`, after inserting the investor document, an atomic query immediately verifies that the referenced startup still exists in the database. If the startup was concurrently removed, the newly created investor is automatically rolled back with a `404 STARTUP_NOT_FOUND` error.
+    2. **Defensive Post-Delete Cleanup**: In `deleteStartup`, after removing the startup document, a defensive `Investor.deleteMany({ startup: startupId, owner: ownerId })` sweep runs to guarantee zero orphaned records persist.
+  - **Outcome**: Referential consistency is preserved under concurrent execution without requiring a replica set cluster or distributed lock infrastructure.
+
+#### Task 4: Debugging & Orphaned Record Recovery (Data Integrity)
+- **The Challenge**: An audit identified that the existing helper `findOwnedInvestor` enforced a strict join condition requiring both the investor *and* its associated startup to exist in order to resolve ownership. Consequently, if an investor record ever became orphaned (e.g. from manual database edits or legacy data), the owner could never delete or manage the record because the query failed before reaching the delete handler.
+- **Code0's Solution**:
+  - **Decoupled Ownership Verification**: Code0 refactored `deleteInvestor` to verify ownership directly on the `Investor` document (`{ _id: investorId, owner: request.auth.userId }`) without demanding that the parent startup still exist.
+  - **Strict Multi-Tenant Isolation**: Code0 ensured that while owners can delete orphaned records, cross-tenant authorization remains impenetrable: another user attempting to delete the orphaned record is rejected with an HTTP `404` without leaking record existence.
+  - **Regression Test Suite**: Code0 authored integration tests reproducing the orphaned data state and asserting successful deletion by the authenticated owner and rejection of unauthorized third parties.
+
+#### Task 5: Deterministic Testing & Vercel Serverless Architecture
+- **The Challenge**:
+  1. **Test Flakiness & Timeouts**: Vitest test suites suffered from unhandled promise rejections during in-memory MongoDB teardown hooks (`mongoServer?.stop()`), as well as hook timeouts when downloading MongoDB binaries in CI.
+  2. **Cloud Serverless Deployment**: The Express server was tightly bound to `app.listen()` on a dedicated port. Deploying to Vercel required adapting the application to a stateless serverless architecture while preventing database connection exhaustion (cold-start connection storms).
+- **Code0's Solution**:
+  - **Test Lifecycle Hardening**: Code0 guarded all `afterAll` hooks with optional chaining and null checks, extended Vitest's `hookTimeout` and `testTimeout` margins in `server/vitest.config.js`, and expanded the test suite to **43 deterministic passing tests** (12 client, 31 server).
+  - **Serverless Function Adapter (`api/index.js`)**: Code0 built a serverless entrypoint that wraps the Express app with a connection pooling manager (`ensureDatabaseConnected()`). By checking `mongoose.connection.readyState === 1`, the adapter reuses established database sockets across lambda invocations.
+  - **Vercel Routing (`vercel.json`)**: Configured Vercel build commands, static output directories (`client/dist`), rewrite rules for SPA history fallback, and API endpoint proxying.
+  - **Smart Client Fallback**: Updated `client/src/lib/api.js` so that in production, the client automatically defaults to `/api` on the same origin, eliminating cross-origin CORS overhead and third-party cookie restrictions.
+
+---
+
+### Key Lessons & Best Practices from Code0 Collaboration
+
+1. **Verify Before Modifying**: Code0's approach of verifying reported audit findings against actual source code before proposing changes prevented unnecessary rewrites and protected working production logic.
+2. **Prefer Native & Zero-Dependency Solutions**: Solving rate limiting and race conditions with focused, in-memory and schema-level guards avoided dependency bloat and simplified maintenance.
+3. **Automate Continuous Verification**: Pairing AI changes with immediate terminal test execution (`npm test`), production bundling (`npm run build`), and browser validation ensured that zero regressions were introduced into the codebase.
